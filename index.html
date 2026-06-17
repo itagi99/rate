@@ -30,9 +30,9 @@
         <div class="bg-blue-600 p-4 text-white sticky top-0 z-10 shadow-md flex justify-between items-center">
             <div>
                 <h1 class="text-xl font-bold">ANP Mart Rates</h1>
-                <p class="text-xs opacity-80">Live Inventory & Pricing</p>
+                <p class="text-xs opacity-80" id="userRoleDisplay">Live Inventory & Pricing</p>
             </div>
-            <button onclick="logout()" class="text-xs bg-blue-700 px-3 py-1 rounded-full border border-blue-500">Logout</button>
+            <button onclick="logout()" class="text-xs bg-blue-700 px-3 py-1 rounded-full border border-blue-500 hover:bg-blue-800 transition">Logout</button>
         </div>
 
         <div class="p-2 bg-white border-b flex gap-2 shadow-sm sticky top-[60px] z-10">
@@ -43,14 +43,14 @@
         </div>
 
         <div class="overflow-x-auto bg-white hide-scrollbar">
-            <table class="w-full text-left border-collapse min-w-[500px]">
+            <table class="w-full text-left border-collapse min-w-[400px]">
                 <thead>
                     <tr class="bg-gray-100 text-gray-600 uppercase text-[10px] leading-tight">
                         <th class="py-2 px-2">Product</th>
                         <th class="py-2 px-2 text-center">Sales (₹)</th>
                         <th class="py-2 px-2 text-center">Purc (₹)</th>
                         <th class="py-2 px-2 text-center">Stock</th>
-                        <th class="py-2 px-2 text-center">Edit</th>
+                        <th id="editColHeader" class="py-2 px-2 text-center hidden">Edit</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody" class="text-xs">
@@ -59,7 +59,7 @@
             </table>
         </div>
 
-        <button onclick="openModal()" class="fixed bottom-6 right-6 bg-blue-600 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center text-3xl hover:bg-blue-700 transition z-20">
+        <button id="fabAdd" onclick="openModal()" class="hidden fixed bottom-6 right-6 bg-blue-600 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center text-3xl hover:bg-blue-700 transition z-20">
             +
         </button>
     </div>
@@ -108,21 +108,39 @@
         const TURSO_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODE2OTgwMDEsImlkIjoiMDE5ZWNmOGYtMzQwMS03OGE4LTllYzEtN2UwZGE0NjM2M2MzIiwicmlkIjoiOWExNjU2MjktNDEyMC00MzhmLThkMWEtZTRkMDJkMTYyZDk3In0.UxrtU2ohc2fnj101Um9KTtnifImTnVTLAs23HlbfeRFfmH60_PMx8fWu43ENgU5y-rdINt2bfUc5tc3mRZPBDA";
 
         let products = [];
+        let currentUserRole = "viewer"; // Default to viewer
 
         // --- AUTH LOGIC ---
         function login() {
             const u = document.getElementById("username").value;
             const p = document.getElementById("password").value;
+            
             if (u === "admin" && p === "admin123") {
-                document.getElementById("loginScreen").classList.add("hidden");
-                document.getElementById("appScreen").classList.remove("hidden");
-                fetchRates(); // Load data only after login
+                currentUserRole = "admin";
+                document.getElementById("userRoleDisplay").innerText = "Admin Access - Edit Mode";
+                document.getElementById("fabAdd").classList.remove("hidden");
+                document.getElementById("editColHeader").classList.remove("hidden");
+                enterApp();
+            } else if (u === "a" && p === "a123") {
+                currentUserRole = "viewer";
+                document.getElementById("userRoleDisplay").innerText = "View Only Mode";
+                document.getElementById("fabAdd").classList.add("hidden");
+                document.getElementById("editColHeader").classList.add("hidden");
+                enterApp();
             } else {
                 document.getElementById("loginError").classList.remove("hidden");
             }
         }
 
+        function enterApp() {
+            document.getElementById("loginError").classList.add("hidden");
+            document.getElementById("loginScreen").classList.add("hidden");
+            document.getElementById("appScreen").classList.remove("hidden");
+            fetchRates();
+        }
+
         function logout() {
+            currentUserRole = "viewer"; // Reset
             document.getElementById("appScreen").classList.add("hidden");
             document.getElementById("loginScreen").classList.remove("hidden");
             document.getElementById("username").value = "";
@@ -190,6 +208,14 @@
                 const rowClass = index % 2 === 0 ? "bg-gray-50" : "bg-white";
                 const stockColor = item.stock_qty < 0 ? 'text-red-600 font-bold' : 'text-gray-800';
                 
+                // Conditional Edit Button
+                let editCell = "";
+                if (currentUserRole === "admin") {
+                    editCell = `<td class="py-2 px-2 text-center">
+                                    <button onclick="openModal(${item.id})" class="bg-gray-200 text-gray-700 px-2 py-1 rounded hover:bg-gray-300">✎</button>
+                                </td>`;
+                }
+
                 const tr = document.createElement("tr");
                 tr.className = `${rowClass} border-b border-gray-200`;
                 tr.innerHTML = `
@@ -200,9 +226,7 @@
                     <td class="py-2 px-2 text-center text-green-700 font-semibold">${item.sales_rate || '-'}</td>
                     <td class="py-2 px-2 text-center text-red-600">${item.purc_rate || '-'}</td>
                     <td class="py-2 px-2 text-center ${stockColor}">${item.stock_qty || '0'}</td>
-                    <td class="py-2 px-2 text-center">
-                        <button onclick="openModal(${item.id})" class="bg-gray-200 text-gray-700 px-2 py-1 rounded hover:bg-gray-300">✎</button>
-                    </td>
+                    ${editCell}
                 `;
                 tbody.appendChild(tr);
             });
@@ -227,6 +251,8 @@
 
         // --- ADD / EDIT LOGIC ---
         function openModal(id = null) {
+            if (currentUserRole !== "admin") return; // Security check
+
             document.getElementById("itemModal").classList.remove("hidden");
             const title = document.getElementById("modalTitle");
             
@@ -255,6 +281,8 @@
         }
 
         async function saveItem() {
+            if (currentUserRole !== "admin") return; // Security check
+
             const btn = document.getElementById("saveBtn");
             btn.innerText = "Saving...";
             btn.disabled = true;
