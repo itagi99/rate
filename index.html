@@ -2,114 +2,179 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily Rate Sheet</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ANP Mart Rates</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Ensures smooth scrolling on mobile */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
 </head>
-<body class="bg-gray-100 p-4 md:p-8 font-sans">
+<body class="bg-gray-100 font-sans antialiased text-gray-800">
 
-    <div class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm">
+            <h2 class="text-2xl font-bold text-center text-blue-600 mb-6">ANP Mart Login</h2>
+            <div class="space-y-4">
+                <input type="text" id="username" placeholder="Username" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                <input type="password" id="password" placeholder="Password" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                <button onclick="login()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">Login</button>
+                <p id="loginError" class="text-red-500 text-sm text-center hidden">Invalid credentials</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="appScreen" class="hidden pb-20">
         
-        <!-- Header -->
-        <div class="bg-blue-600 p-6 text-white text-center">
-            <h1 class="text-3xl font-bold">Daily Rate Sheet</h1>
-            <p class="text-sm mt-2 opacity-80">Live product rates and stock availability</p>
+        <div class="bg-blue-600 p-4 text-white sticky top-0 z-10 shadow-md flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold">ANP Mart Rates</h1>
+                <p class="text-xs opacity-80">Live Inventory & Pricing</p>
+            </div>
+            <button onclick="logout()" class="text-xs bg-blue-700 px-3 py-1 rounded-full border border-blue-500">Logout</button>
         </div>
 
-        <!-- Controls (Search & Filter) -->
-        <div class="p-6 bg-gray-50 border-b flex flex-col md:flex-row gap-4 justify-between items-center">
-            
-            <div class="w-full md:w-1/2 relative">
-                <input type="text" id="searchInput" placeholder="Search products..." 
-                    class="w-full pl-4 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-
-            <div class="w-full md:w-1/3">
-                <select id="categoryFilter" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                    <option value="ALL">All Categories</option>
-                </select>
-            </div>
-
+        <div class="p-2 bg-white border-b flex gap-2 shadow-sm sticky top-[60px] z-10">
+            <input type="text" id="searchInput" placeholder="Search..." class="w-2/3 px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            <select id="categoryFilter" class="w-1/3 px-2 py-2 text-sm border rounded-lg bg-white outline-none">
+                <option value="ALL">All</option>
+            </select>
         </div>
 
-        <!-- Data Table -->
-        <div class="overflow-x-auto p-6">
-            <table class="w-full text-left border-collapse">
+        <div class="overflow-x-auto bg-white hide-scrollbar">
+            <table class="w-full text-left border-collapse min-w-[500px]">
                 <thead>
-                    <tr class="bg-gray-200 text-gray-700 uppercase text-sm leading-normal">
-                        <th class="py-3 px-6 text-left">Product Name</th>
-                        <th class="py-3 px-6 text-left">Category</th>
-                        <th class="py-3 px-6 text-center">Sales Rate</th>
-                        <th class="py-3 px-6 text-center">Purchase Rate</th>
-                        <th class="py-3 px-6 text-center">Stock Qty</th>
+                    <tr class="bg-gray-100 text-gray-600 uppercase text-[10px] leading-tight">
+                        <th class="py-2 px-2">Product</th>
+                        <th class="py-2 px-2 text-center">Sales (₹)</th>
+                        <th class="py-2 px-2 text-center">Purc (₹)</th>
+                        <th class="py-2 px-2 text-center">Stock</th>
+                        <th class="py-2 px-2 text-center">Edit</th>
                     </tr>
                 </thead>
-                <tbody id="tableBody" class="text-gray-600 text-sm font-light">
-                    <tr>
-                        <td colspan="5" class="py-10 text-center text-gray-500">Loading live data...</td>
-                    </tr>
+                <tbody id="tableBody" class="text-xs">
+                    <tr><td colspan="5" class="py-8 text-center text-gray-500">Loading database...</td></tr>
                 </tbody>
             </table>
+        </div>
+
+        <button onclick="openModal()" class="fixed bottom-6 right-6 bg-blue-600 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center text-3xl hover:bg-blue-700 transition z-20">
+            +
+        </button>
+    </div>
+
+    <div id="itemModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end md:items-center justify-center">
+        <div class="bg-white w-full md:w-96 rounded-t-2xl md:rounded-xl p-6 transform transition-all shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="modalTitle" class="text-lg font-bold">Add New Item</h3>
+                <button onclick="closeModal()" class="text-gray-500 text-2xl font-bold">&times;</button>
+            </div>
+            
+            <input type="hidden" id="editId">
+            
+            <div class="space-y-3 text-sm">
+                <div>
+                    <label class="text-gray-500 text-xs">Product Name</label>
+                    <input type="text" id="m_name" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="text-gray-500 text-xs">Category</label>
+                    <input type="text" id="m_cat" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div class="flex gap-2">
+                    <div class="w-1/2">
+                        <label class="text-gray-500 text-xs">Sales Rate (e.g. ₹50.00)</label>
+                        <input type="text" id="m_sales" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div class="w-1/2">
+                        <label class="text-gray-500 text-xs">Purchase Rate</label>
+                        <input type="text" id="m_purc" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-gray-500 text-xs">Stock Quantity</label>
+                    <input type="number" id="m_stock" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                
+                <button onclick="saveItem()" id="saveBtn" class="w-full bg-green-600 text-white font-bold py-3 mt-2 rounded-lg hover:bg-green-700">Save Item</button>
+            </div>
         </div>
     </div>
 
     <script>
-        // --- 🔴 REPLACE THESE WITH YOUR TURSO DETAILS 🔴 ---
+        // --- TURSO CONFIG ---
         const TURSO_URL = "https://kata-itagi99.aws-ap-south-1.turso.io";
         const TURSO_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODE2OTgwMDEsImlkIjoiMDE5ZWNmOGYtMzQwMS03OGE4LTllYzEtN2UwZGE0NjM2M2MzIiwicmlkIjoiOWExNjU2MjktNDEyMC00MzhmLThkMWEtZTRkMDJkMTYyZDk3In0.UxrtU2ohc2fnj101Um9KTtnifImTnVTLAs23HlbfeRFfmH60_PMx8fWu43ENgU5y-rdINt2bfUc5tc3mRZPBDA";
-        // ----------------------------------------------------
 
         let products = [];
 
+        // --- AUTH LOGIC ---
+        function login() {
+            const u = document.getElementById("username").value;
+            const p = document.getElementById("password").value;
+            if (u === "admin" && p === "admin123") {
+                document.getElementById("loginScreen").classList.add("hidden");
+                document.getElementById("appScreen").classList.remove("hidden");
+                fetchRates(); // Load data only after login
+            } else {
+                document.getElementById("loginError").classList.remove("hidden");
+            }
+        }
+
+        function logout() {
+            document.getElementById("appScreen").classList.add("hidden");
+            document.getElementById("loginScreen").classList.remove("hidden");
+            document.getElementById("username").value = "";
+            document.getElementById("password").value = "";
+        }
+
+        // --- DATABASE FETCH ---
         async function fetchRates() {
             try {
                 const response = await fetch(`${TURSO_URL}/v2/pipeline`, {
                     method: "POST",
-                    headers: {
-                        "Authorization": `Bearer ${TURSO_TOKEN}`,
-                        "Content-Type": "application/json"
-                    },
+                    headers: { "Authorization": `Bearer ${TURSO_TOKEN}`, "Content-Type": "application/json" },
                     body: JSON.stringify({
                         requests: [
-                            { type: "execute", stmt: { sql: "SELECT * FROM rates" } },
+                            { type: "execute", stmt: { sql: "SELECT * FROM rates ORDER BY product_name ASC" } },
                             { type: "close" }
                         ]
                     })
                 });
 
                 const data = await response.json();
-                
-                // Turso HTTP API returns data in columns and rows arrays. We need to map them.
                 const result = data.results[0].response.result;
                 const columns = result.cols.map(c => c.name);
                 
                 products = result.rows.map(row => {
                     let obj = {};
-                    row.forEach((value, index) => {
-                        obj[columns[index]] = value.value;
-                    });
+                    row.forEach((value, index) => { obj[columns[index]] = value.value; });
                     return obj;
                 });
 
                 populateCategories();
                 renderTable(products);
-
             } catch (error) {
-                document.getElementById("tableBody").innerHTML = `<tr><td colspan="5" class="py-10 text-center text-red-500">Failed to connect to database. Check URL and Token.</td></tr>`;
-                console.error("Database connection error:", error);
+                alert("Failed to sync with database.");
+                console.error(error);
             }
         }
 
+        // --- UI RENDERING ---
         function populateCategories() {
             const select = document.getElementById("categoryFilter");
-            const uniqueCategories = [...new Set(products.map(p => p.category))].filter(Boolean).sort();
+            const currentVal = select.value;
+            select.innerHTML = '<option value="ALL">All</option>'; // Reset
             
+            const uniqueCategories = [...new Set(products.map(p => p.category))].filter(Boolean).sort();
             uniqueCategories.forEach(category => {
                 const option = document.createElement("option");
                 option.value = category;
                 option.textContent = category;
                 select.appendChild(option);
             });
+            select.value = currentVal; // Restore selection
         }
 
         function renderTable(data) {
@@ -117,22 +182,27 @@
             tbody.innerHTML = ""; 
 
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="py-10 text-center text-gray-500">No products found.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-gray-500">No products found.</td></tr>`;
                 return;
             }
 
             data.forEach((item, index) => {
                 const rowClass = index % 2 === 0 ? "bg-gray-50" : "bg-white";
-                const stockColor = item.stock_qty < 0 ? 'text-red-600' : 'text-gray-700';
+                const stockColor = item.stock_qty < 0 ? 'text-red-600 font-bold' : 'text-gray-800';
                 
                 const tr = document.createElement("tr");
-                tr.className = `${rowClass} border-b border-gray-200 hover:bg-gray-100 transition-colors`;
+                tr.className = `${rowClass} border-b border-gray-200`;
                 tr.innerHTML = `
-                    <td class="py-3 px-6 text-left whitespace-nowrap font-medium text-gray-900">${item.product_name || '-'}</td>
-                    <td class="py-3 px-6 text-left text-xs"><span class="bg-blue-100 text-blue-800 py-1 px-2 rounded-full">${item.category || '-'}</span></td>
-                    <td class="py-3 px-6 text-center font-bold text-green-600">${item.sales_rate || '-'}</td>
-                    <td class="py-3 px-6 text-center text-red-500">${item.purc_rate || '-'}</td>
-                    <td class="py-3 px-6 text-center font-semibold ${stockColor}">${item.stock_qty || '0'}</td>
+                    <td class="py-2 px-2 max-w-[120px] truncate font-medium text-gray-900">
+                        ${item.product_name || '-'}
+                        <div class="text-[10px] text-blue-600 font-normal">${item.category || '-'}</div>
+                    </td>
+                    <td class="py-2 px-2 text-center text-green-700 font-semibold">${item.sales_rate || '-'}</td>
+                    <td class="py-2 px-2 text-center text-red-600">${item.purc_rate || '-'}</td>
+                    <td class="py-2 px-2 text-center ${stockColor}">${item.stock_qty || '0'}</td>
+                    <td class="py-2 px-2 text-center">
+                        <button onclick="openModal(${item.id})" class="bg-gray-200 text-gray-700 px-2 py-1 rounded hover:bg-gray-300">✎</button>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -152,11 +222,90 @@
             renderTable(filteredData);
         }
 
-        document.getElementById("searchInput").addEventListener("keyup", handleFilter);
+        document.getElementById("searchInput").addEventListener("input", handleFilter);
         document.getElementById("categoryFilter").addEventListener("change", handleFilter);
 
-        // Fetch data when the page loads
-        fetchRates();
+        // --- ADD / EDIT LOGIC ---
+        function openModal(id = null) {
+            document.getElementById("itemModal").classList.remove("hidden");
+            const title = document.getElementById("modalTitle");
+            
+            if (id) {
+                title.innerText = "Edit Item";
+                const item = products.find(p => p.id === id);
+                document.getElementById("editId").value = item.id;
+                document.getElementById("m_name").value = item.product_name;
+                document.getElementById("m_cat").value = item.category;
+                document.getElementById("m_sales").value = item.sales_rate;
+                document.getElementById("m_purc").value = item.purc_rate;
+                document.getElementById("m_stock").value = item.stock_qty;
+            } else {
+                title.innerText = "Add New Item";
+                document.getElementById("editId").value = "";
+                document.getElementById("m_name").value = "";
+                document.getElementById("m_cat").value = "";
+                document.getElementById("m_sales").value = "₹";
+                document.getElementById("m_purc").value = "₹";
+                document.getElementById("m_stock").value = "0";
+            }
+        }
+
+        function closeModal() {
+            document.getElementById("itemModal").classList.add("hidden");
+        }
+
+        async function saveItem() {
+            const btn = document.getElementById("saveBtn");
+            btn.innerText = "Saving...";
+            btn.disabled = true;
+
+            const id = document.getElementById("editId").value;
+            const name = document.getElementById("m_name").value;
+            const cat = document.getElementById("m_cat").value;
+            const sales = document.getElementById("m_sales").value;
+            const purc = document.getElementById("m_purc").value;
+            const stock = document.getElementById("m_stock").value;
+
+            let sqlQuery = "";
+            let sqlArgs = [
+                { type: "text", value: name },
+                { type: "text", value: cat },
+                { type: "text", value: sales },
+                { type: "text", value: purc },
+                { type: "float", value: parseFloat(stock) || 0 }
+            ];
+
+            if (id) {
+                // UPDATE
+                sqlQuery = "UPDATE rates SET product_name=?, category=?, sales_rate=?, purc_rate=?, stock_qty=? WHERE id=?";
+                sqlArgs.push({ type: "integer", value: parseInt(id) });
+            } else {
+                // INSERT
+                sqlQuery = "INSERT INTO rates (product_name, category, sales_rate, purc_rate, stock_qty) VALUES (?, ?, ?, ?, ?)";
+            }
+
+            try {
+                await fetch(`${TURSO_URL}/v2/pipeline`, {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${TURSO_TOKEN}`, "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        requests: [
+                            { type: "execute", stmt: { sql: sqlQuery, args: sqlArgs } },
+                            { type: "close" }
+                        ]
+                    })
+                });
+
+                closeModal();
+                await fetchRates(); // Refresh the list
+            } catch (error) {
+                alert("Failed to save item.");
+                console.error(error);
+            } finally {
+                btn.innerText = "Save Item";
+                btn.disabled = false;
+            }
+        }
     </script>
 </body>
 </html>
