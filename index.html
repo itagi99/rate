@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Rate Sheet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-4 md:p-8 font-sans">
+
+    <div class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+        
+        <!-- Header -->
+        <div class="bg-blue-600 p-6 text-white text-center">
+            <h1 class="text-3xl font-bold">Daily Rate Sheet</h1>
+            <p class="text-sm mt-2 opacity-80">Live product rates and stock availability</p>
+        </div>
+
+        <!-- Controls (Search & Filter) -->
+        <div class="p-6 bg-gray-50 border-b flex flex-col md:flex-row gap-4 justify-between items-center">
+            
+            <div class="w-full md:w-1/2 relative">
+                <input type="text" id="searchInput" placeholder="Search products..." 
+                    class="w-full pl-4 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div class="w-full md:w-1/3">
+                <select id="categoryFilter" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                    <option value="ALL">All Categories</option>
+                </select>
+            </div>
+
+        </div>
+
+        <!-- Data Table -->
+        <div class="overflow-x-auto p-6">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-200 text-gray-700 uppercase text-sm leading-normal">
+                        <th class="py-3 px-6 text-left">Product Name</th>
+                        <th class="py-3 px-6 text-left">Category</th>
+                        <th class="py-3 px-6 text-center">Sales Rate</th>
+                        <th class="py-3 px-6 text-center">Purchase Rate</th>
+                        <th class="py-3 px-6 text-center">Stock Qty</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody" class="text-gray-600 text-sm font-light">
+                    <tr>
+                        <td colspan="5" class="py-10 text-center text-gray-500">Loading live data...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // --- 🔴 REPLACE THESE WITH YOUR TURSO DETAILS 🔴 ---
+        const TURSO_URL = "https://kata-itagi99.aws-ap-south-1.turso.io";
+        const TURSO_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODE2OTgwMDEsImlkIjoiMDE5ZWNmOGYtMzQwMS03OGE4LTllYzEtN2UwZGE0NjM2M2MzIiwicmlkIjoiOWExNjU2MjktNDEyMC00MzhmLThkMWEtZTRkMDJkMTYyZDk3In0.UxrtU2ohc2fnj101Um9KTtnifImTnVTLAs23HlbfeRFfmH60_PMx8fWu43ENgU5y-rdINt2bfUc5tc3mRZPBDA";
+        // ----------------------------------------------------
+
+        let products = [];
+
+        async function fetchRates() {
+            try {
+                const response = await fetch(`${TURSO_URL}/v2/pipeline`, {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${TURSO_TOKEN}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        requests: [
+                            { type: "execute", stmt: { sql: "SELECT * FROM rates" } },
+                            { type: "close" }
+                        ]
+                    })
+                });
+
+                const data = await response.json();
+                
+                // Turso HTTP API returns data in columns and rows arrays. We need to map them.
+                const result = data.results[0].response.result;
+                const columns = result.cols.map(c => c.name);
+                
+                products = result.rows.map(row => {
+                    let obj = {};
+                    row.forEach((value, index) => {
+                        obj[columns[index]] = value.value;
+                    });
+                    return obj;
+                });
+
+                populateCategories();
+                renderTable(products);
+
+            } catch (error) {
+                document.getElementById("tableBody").innerHTML = `<tr><td colspan="5" class="py-10 text-center text-red-500">Failed to connect to database. Check URL and Token.</td></tr>`;
+                console.error("Database connection error:", error);
+            }
+        }
+
+        function populateCategories() {
+            const select = document.getElementById("categoryFilter");
+            const uniqueCategories = [...new Set(products.map(p => p.category))].filter(Boolean).sort();
+            
+            uniqueCategories.forEach(category => {
+                const option = document.createElement("option");
+                option.value = category;
+                option.textContent = category;
+                select.appendChild(option);
+            });
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById("tableBody");
+            tbody.innerHTML = ""; 
+
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-10 text-center text-gray-500">No products found.</td></tr>`;
+                return;
+            }
+
+            data.forEach((item, index) => {
+                const rowClass = index % 2 === 0 ? "bg-gray-50" : "bg-white";
+                const stockColor = item.stock_qty < 0 ? 'text-red-600' : 'text-gray-700';
+                
+                const tr = document.createElement("tr");
+                tr.className = `${rowClass} border-b border-gray-200 hover:bg-gray-100 transition-colors`;
+                tr.innerHTML = `
+                    <td class="py-3 px-6 text-left whitespace-nowrap font-medium text-gray-900">${item.product_name || '-'}</td>
+                    <td class="py-3 px-6 text-left text-xs"><span class="bg-blue-100 text-blue-800 py-1 px-2 rounded-full">${item.category || '-'}</span></td>
+                    <td class="py-3 px-6 text-center font-bold text-green-600">${item.sales_rate || '-'}</td>
+                    <td class="py-3 px-6 text-center text-red-500">${item.purc_rate || '-'}</td>
+                    <td class="py-3 px-6 text-center font-semibold ${stockColor}">${item.stock_qty || '0'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function handleFilter() {
+            const searchTerm = document.getElementById("searchInput").value.toLowerCase();
+            const categoryFilter = document.getElementById("categoryFilter").value;
+
+            const filteredData = products.filter(product => {
+                const name = (product.product_name || "").toLowerCase();
+                const matchesSearch = name.includes(searchTerm);
+                const matchesCategory = categoryFilter === "ALL" || product.category === categoryFilter;
+                return matchesSearch && matchesCategory;
+            });
+
+            renderTable(filteredData);
+        }
+
+        document.getElementById("searchInput").addEventListener("keyup", handleFilter);
+        document.getElementById("categoryFilter").addEventListener("change", handleFilter);
+
+        // Fetch data when the page loads
+        fetchRates();
+    </script>
+</body>
+</html>
