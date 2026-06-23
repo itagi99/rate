@@ -137,16 +137,12 @@
     </div>
 
     <script>
-        // --- TURSO CONFIG ---
-        // Note: For production apps, avoid hardcoding tokens in frontend HTML. 
-        // Use your Next.js/Node backend as a middleman for security.
         const TURSO_URL = "https://rate-itagi99.aws-ap-south-1.turso.io";
         const TURSO_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODIyMzAyNjgsImlkIjoiMDE5ZWY1MjItNDgwMS03MzFkLWEwNDMtOTEyMmZiYThiNjI2IiwicmlkIjoiZGExNWI0ZWEtZWJmNi00MjQ5LTk1YjUtYmMzZTg2NGNmYzdhIn0.SAcQ9gl2S0jjDXVNxxqfjd0bx8UkJGXRX94hlUjPPTQ46L6frO0xbCP7nv_1KziQPoeRTOVGZtFOLxr0P0WzAw";
 
         let products = [];
         let currentUserRole = "viewer";
 
-        // --- AUTH LOGIC ---
         function login() {
             const u = document.getElementById("username").value;
             const p = document.getElementById("password").value;
@@ -183,7 +179,6 @@
             document.getElementById("password").value = "";
         }
 
-        // --- DATABASE FETCH ---
         async function fetchRates() {
             try {
                 const response = await fetch(`${TURSO_URL}/v2/pipeline`, {
@@ -191,7 +186,6 @@
                     headers: { "Authorization": `Bearer ${TURSO_TOKEN}`, "Content-Type": "application/json" },
                     body: JSON.stringify({
                         requests: [
-                            // Querying the specific products table schema we created earlier
                             { type: "execute", stmt: { sql: "SELECT * FROM products ORDER BY sl_no ASC" } },
                             { type: "close" }
                         ]
@@ -199,6 +193,12 @@
                 });
 
                 const data = await response.json();
+
+                // Explicitly check for Turso SQL errors
+                if (data.results && data.results[0].type === "error") {
+                    throw new Error("Turso Error: " + data.results[0].error.message);
+                }
+
                 const result = data.results[0].response.result;
                 const columns = result.cols.map(c => c.name);
                 
@@ -211,12 +211,15 @@
                 populateCategories();
                 renderTable(products);
             } catch (error) {
-                document.getElementById("tableBody").innerHTML = `<tr><td colspan="6" class="py-8 text-center text-red-500 font-bold">Failed to load database. Check connection.</td></tr>`;
-                console.error(error);
+                let errorMsg = error.message.includes("CORS") || error.message === "Failed to fetch" 
+                    ? "Network/CORS Error: Browser blocked connection. Please check console." 
+                    : error.message;
+
+                document.getElementById("tableBody").innerHTML = `<tr><td colspan="6" class="py-8 text-center text-red-500 font-bold">${errorMsg}</td></tr>`;
+                console.error("Fetch Error:", error);
             }
         }
 
-        // --- UI RENDERING ---
         function populateCategories() {
             const select = document.getElementById("categoryFilter");
             const currentVal = select.value;
@@ -273,7 +276,6 @@
             });
         }
 
-        // --- FILTERING ---
         function handleFilter() {
             const searchTerm = document.getElementById("searchInput").value.toLowerCase();
             const categoryFilter = document.getElementById("categoryFilter").value;
@@ -292,7 +294,6 @@
         document.getElementById("searchInput").addEventListener("input", handleFilter);
         document.getElementById("categoryFilter").addEventListener("change", handleFilter);
 
-        // --- MODAL LOGIC ---
         function openModal(sl_no = null) {
             if (currentUserRole !== "admin") return; 
 
@@ -364,21 +365,19 @@
             ];
 
             if (sl_no) {
-                // UPDATE
                 sqlQuery = `UPDATE products SET 
                             product_name=?, secondary_unit=?, conversion_qty=?, basic_unit=?, category=?, 
                             stock_basic_units=?, basic_rate=?, wholesale_rate=?, remarks=? 
                             WHERE sl_no=?`;
                 sqlArgs.push({ type: "integer", value: parseInt(sl_no) });
             } else {
-                // INSERT
                 sqlQuery = `INSERT INTO products 
                             (product_name, secondary_unit, conversion_qty, basic_unit, category, stock_basic_units, basic_rate, wholesale_rate, remarks) 
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
             }
 
             try {
-                await fetch(`${TURSO_URL}/v2/pipeline`, {
+                const response = await fetch(`${TURSO_URL}/v2/pipeline`, {
                     method: "POST",
                     headers: { "Authorization": `Bearer ${TURSO_TOKEN}`, "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -389,11 +388,19 @@
                     })
                 });
 
+                const data = await response.json();
+
+                if (data.results && data.results[0].type === "error") {
+                    throw new Error("Turso Database Error: " + data.results[0].error.message);
+                }
+
                 closeModal();
-                await fetchRates(); // Refresh UI with new data
+                await fetchRates(); 
             } catch (error) {
-                alert("Failed to save item. Please try again.");
-                console.error(error);
+                alert(error.message.includes("CORS") || error.message === "Failed to fetch" 
+                    ? "Network/CORS Error: Cannot connect to Turso from browser. Check console." 
+                    : error.message);
+                console.error("Save Error:", error);
             } finally {
                 btn.innerText = "Save Product";
                 btn.disabled = false;
